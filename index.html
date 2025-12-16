@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Histórico de Status - Máquinas</title>
+
+  <style>
+    :root{
+      --bg:#061529;
+      --line:rgba(255,255,255,0.10);
+
+      --txt:#ffffff;
+      --muted:#a8d0ff;
+
+      --green:#3aa868;
+      --green2:rgba(58,168,104,0.18);
+
+      --red:#d64545;
+      --red2:rgba(214,69,69,0.18);
+
+      --orange:#e2a300;       /* manutenção (amarelo/laranja) */
+      --orange2:rgba(226,163,0,0.20);
+
+      --shadow:0 6px 22px rgba(0,0,0,0.55);
+      --shadowSoft:0 4px 12px rgba(0,0,0,0.45);
+      --r18:18px;
+    }
+
+    *{ margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Arial, sans-serif; }
+    body{ background:var(--bg); color:var(--txt); min-height:100vh; }
+
+    /* CABEÇALHO */
+    .header{
+      max-width:1400px; margin:15px auto 5px;
+      display:grid; grid-template-columns:1fr 230px; gap:15px; align-items:center;
+      padding:0 12px;
+    }
+    .header-title-box{
+      background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border:1px solid var(--line);
+      padding:18px 26px; border-radius:var(--r18);
+      box-shadow:var(--shadowSoft);
+    }
+    .header-title-box h1{ font-size:22px; letter-spacing:1px; margin-bottom:3px; }
+    .subtitle{ color:var(--muted); font-size:12px; }
+
+    .header-logo-box{
+      background:#ffffff; border-radius:var(--r18);
+      height:70px; display:flex; align-items:center; justify-content:center;
+      box-shadow:var(--shadowSoft);
+      overflow:hidden;
+    }
+    .header-logo-box img{ max-height:64px; width:auto; }
+
+    /* CONTROLES */
+    .controls{
+      max-width:1400px; margin:0 auto 10px; padding:6px 12px;
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end;
+    }
+    .btn{
+      padding:9px 18px; border:none; border-radius:10px;
+      font-weight:800; cursor:pointer; transition:all .2s;
+      display:flex; align-items:center; gap:8px; font-size:13px;
+      box-shadow:0 4px 14px rgba(0,0,0,0.30);
+    }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; transform:none !important; }
+    .btn-primary{ background:var(--green); color:#fff; }
+    .btn-primary:hover{ background:#2e8b57; transform:translateY(-1px); }
+    .btn-secondary{ background:rgba(255,255,255,0.08); color:#fff; border:1px solid var(--line); }
+    .btn-secondary:hover{ background:rgba(255,255,255,0.12); transform:translateY(-1px); }
+
+    .status{
+      min-width:260px; padding:8px 12px; border-radius:10px;
+      background:rgba(0,0,0,0.35); border:1px solid var(--line);
+      font-size:11px;
+      backdrop-filter: blur(6px);
+    }
+    .status.success{ background:rgba(58,168,104,0.18); border-color:rgba(58,168,104,0.5); color:#bff7d6; }
+    .status.error{ background:rgba(255,107,107,0.18); border-color:rgba(255,107,107,0.55); color:#ffd6d6; }
+    .status.loading{ background:rgba(255,167,38,0.18); border-color:rgba(255,167,38,0.55); color:#ffe0b2; }
+
+    .loading-spinner{
+      display:inline-block; width:16px; height:16px;
+      border:2px solid rgba(255,255,255,0.25);
+      border-radius:50%; border-top-color:#fff;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin{ to{ transform:rotate(360deg);} }
+
+    /* DASHBOARD */
+    .dashboard{
+      display:grid; grid-template-columns:250px 1fr 360px;
+      gap:15px; padding:10px 12px 15px;
+      max-width:1400px; margin:0 auto;
+    }
+    @media (max-width:1100px){ .dashboard{ grid-template-columns:1fr; } }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:15px 18px;
+      box-shadow:var(--shadow);
+    }
+    .card-header{
+      font-size:15px; margin-bottom:12px; padding-bottom:10px;
+      border-bottom:2px solid rgba(255,255,255,0.10);
+      display:flex; justify-content:space-between; align-items:center;
+      font-weight:900;
+      gap:10px;
+    }
+    .card-title-wrap{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .period-pill{
+      font-size:12px; font-weight:800;
+      padding:5px 10px; border-radius:999px;
+      background:rgba(0,0,0,0.28);
+      border:1px solid rgba(255,255,255,0.10);
+      color:#cfe3ff;
+      white-space:nowrap;
+    }
+
+    /* SELEÇÃO DE MÁQUINA */
+    .machine-select-label{ font-size:13px; font-weight:800; margin-bottom:6px; display:block; }
+    .machine-select{
+      width:100%; padding:10px 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(0,0,0,0.45);
+      color:#fff; font-size:14px; cursor:pointer;
+      outline:none;
+    }
+    .machine-select option{ background:#111a2b; }
+
+    /* STATUS ATUAL */
+    .current-status{
+      background:rgba(0,0,0,0.30);
+      border-radius:14px;
+      padding:14px 14px;
+      margin-top:14px;
+      border:2px solid rgba(255,255,255,0.10);
+    }
+    .status-label{ font-size:12px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; }
+    .status-value{ font-size:22px; font-weight:1000; margin-bottom:6px; }
+    .status-timestamp{ font-size:11px; color:rgba(255,255,255,0.65); }
+
+    /* BOTÕES DE STATUS */
+    .status-buttons{ display:grid; grid-template-columns:1fr; gap:10px; margin-top:14px; }
+    .status-btn{
+      padding:12px; border:none; border-radius:12px; font-weight:1000;
+      cursor:pointer; transition:.2s; font-size:14px;
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      box-shadow:0 10px 18px rgba(0,0,0,0.28);
+    }
+    .status-btn:hover{ transform:translateY(-2px); filter:brightness(1.03); }
+    .status-btn-run{ background:linear-gradient(180deg, rgba(58,168,104,0.95), rgba(46,139,87,0.95)); color:#fff; }
+    .status-btn-stop{ background:linear-gradient(180deg, rgba(214,69,69,0.95), rgba(180,50,50,0.95)); color:#fff; }
+    .status-btn-maint{ background:linear-gradient(180deg, rgba(226,163,0,0.95), rgba(212,140,0,0.95)); color:#1a1a1a; }
+
+    /* mensagens */
+    .message{
+      padding:10px 12px; border-radius:12px; margin:12px 0 0;
+      font-size:13px; display:none; border:1px solid transparent;
+      font-weight:800;
+    }
+    .message.success{ background:rgba(58,168,104,0.18); border-color:rgba(58,168,104,0.55); color:#bff7d6; }
+    .message.error{ background:rgba(255,107,107,0.18); border-color:rgba(255,107,107,0.55); color:#ffd6d6; }
+    .message.loading{ background:rgba(255,167,38,0.18); border-color:rgba(255,167,38,0.55); color:#ffe0b2; }
+
+    /* RESUMO */
+    .summary-grid{
+      display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:12px;
+    }
+    .summary-item{
+      background:rgba(0,0,0,0.28);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px;
+      padding:12px;
+    }
+    .summary-label{ font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:800; }
+    .summary-value{ font-size:20px; font-weight:1000; }
+
+    /* RECENTES */
+    .recent-history{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
+    .history-item{
+      background:linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.10));
+      border-radius:16px;
+      padding:12px 14px;
+      border:1px solid rgba(255,255,255,0.07);
+      position:relative;
+      overflow:hidden;
+      box-shadow:0 10px 20px rgba(0,0,0,0.18);
+    }
+    .history-item::before{
+      content:""; position:absolute; left:0; top:0; bottom:0; width:5px;
+      background:var(--green);
+      opacity:0.9;
+    }
+    .history-item.parada::before{ background:var(--red); }
+    .history-item.manutencao::before{ background:var(--orange); }
+
+    .history-time{ font-size:11px; color:rgba(255,255,255,0.65); margin-bottom:6px; }
+    .history-status{ font-size:16px; font-weight:1000; margin-bottom:6px; }
+    .history-obs{ font-size:12px; color:#cfe3ff; line-height:1.35; }
+    .history-obs b{ font-weight:1000; }
+
+    /* TABELA */
+    .records-pill{
+      background:rgba(58,168,104,0.20);
+      border:1px solid rgba(58,168,104,0.35);
+      padding:6px 12px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:1000;
+      white-space:nowrap;
+    }
+
+    .filters-row{
+      display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; align-items:center;
+    }
+    .filter-select{
+      padding:10px 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(0,0,0,0.40);
+      color:#fff; font-size:13px; cursor:pointer; min-width:200px;
+      outline:none;
+      font-weight:800;
+    }
+    .filter-select option{ background:#111a2b; }
+
+    .filters-advanced{
+      display:none;
+      margin-bottom:12px;
+      padding:12px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(0,0,0,0.20);
+    }
+    .filters-advanced.show{ display:block; }
+    .filters-advanced .filters-row{ margin-bottom:0; }
+
+    .filters-toggle{
+      display:flex; align-items:center; gap:8px;
+      padding:8px 12px; border-radius:999px;
+      background:rgba(0,0,0,0.25);
+      border:1px solid rgba(255,255,255,0.10);
+      cursor:pointer;
+      font-weight:1000;
+      user-select:none;
+      transition:.2s;
+    }
+    .filters-toggle:hover{ background:rgba(0,0,0,0.35); transform:translateY(-1px); }
+    .filters-toggle .dot{ width:8px; height:8px; border-radius:50%; background:#9bc3ff; opacity:0.9; }
+
+    .history-table-container{
+      max-height:600px; overflow:auto;
+      border-radius:16px;
+      background:rgba(0,0,0,0.18);
+      border:1px solid rgba(255,255,255,0.07);
+    }
+    .history-table{ width:100%; border-collapse:collapse; font-size:12px; }
+    .history-table th{
+      background:rgba(58,168,104,0.25);
+      padding:12px 10px;
+      text-align:left;
+      position:sticky; top:0; z-index:10;
+      font-weight:1000;
+      white-space:nowrap;
+    }
+    .history-table td{
+      padding:10px 10px;
+      border-bottom:1px solid rgba(255,255,255,0.06);
+      vertical-align:top;
+      font-weight:800;
+    }
+    .history-table tr:hover{ background:rgba(255,255,255,0.04); }
+
+    .history-table td.obs-cell{
+      min-width:360px;            /* ✅ Observação mais larga */
+      white-space:normal;
+      line-height:1.35;
+    }
+
+    .status-badge{
+      display:inline-block;
+      padding:5px 12px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:1000;
+      min-width:170px;
+      text-align:center;
+      border:1px solid transparent;
+      white-space:nowrap;
+    }
+    .status-badge.funcionamento{ background:var(--green2); color:#aef3c7; border-color:rgba(58,168,104,0.45); }
+    .status-badge.parada{ background:var(--red2); color:#ffd0d0; border-color:rgba(214,69,69,0.45); }
+    .status-badge.manutencao{ background:var(--orange2); color:#ffe7a8; border-color:rgba(226,163,0,0.50); }
+
+    .footer{
+      max-width:1400px; margin:10px auto; padding:10px 12px;
+      text-align:center; color:rgba(255,255,255,0.55); font-size:11px;
+    }
+
+    /* MODAL */
+    .modal-overlay{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,0.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:9999;
+      backdrop-filter: blur(6px);
+    }
+    .modal-overlay.show{ display:flex; }
+
+    .modal{
+      width:min(860px, 98vw);
+      background:linear-gradient(180deg, rgba(35,54,82,0.96), rgba(18,32,55,0.96));
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:26px;
+      box-shadow:0 30px 80px rgba(0,0,0,0.60);
+      overflow:hidden;
+    }
+    .modal-header{
+      padding:16px 18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.10);
+    }
+    .modal-title{
+      display:flex; align-items:center; gap:10px;
+      font-weight:1000; font-size:16px;
+    }
+    .modal-icon{
+      width:18px; height:18px; border-radius:4px;
+      display:inline-flex; align-items:center; justify-content:center;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.12);
+    }
+    .modal-close{
+      width:36px; height:36px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.25);
+      color:#fff; cursor:pointer;
+      font-size:18px;
+      transition:.2s;
+    }
+    .modal-close:hover{ background:rgba(0,0,0,0.35); transform:translateY(-1px); }
+
+    .modal-body{ padding:16px 18px; }
+    .modal-card{
+      background:rgba(0,0,0,0.22);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:18px;
+      padding:14px;
+    }
+
+    .modal-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width:720px){
+      .modal-grid{ grid-template-columns:1fr; }
+    }
+
+    .field{ display:flex; flex-direction:column; gap:6px; }
+    .field label{ font-size:12px; color:#cfe3ff; font-weight:1000; }
+    .input, .select, .textarea{
+      width:100%;
+      padding:11px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(0,0,0,0.35);
+      color:#fff;
+      outline:none;
+      font-size:13px;
+      font-weight:800;
+    }
+
+    /* ✅ Observação maior */
+    .textarea{
+      min-height:135px;           /* aumentei */
+      resize:vertical;
+      font-size:14px;
+      line-height:1.35;
+    }
+
+    .hint{ font-size:11px; color:rgba(255,255,255,0.65); margin-top:6px; }
+    .err{
+      display:none;
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,107,107,0.55);
+      background:rgba(255,107,107,0.16);
+      color:#ffd6d6;
+      font-size:12px;
+      font-weight:1000;
+    }
+    .err.show{ display:block; }
+
+    .modal-footer{
+      padding:14px 18px;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      border-top:1px solid rgba(255,255,255,0.10);
+      background:rgba(0,0,0,0.12);
+    }
+    .btn-modal{
+      padding:11px 16px; border-radius:14px; border:none;
+      cursor:pointer; font-weight:1000;
+      transition:.2s;
+      display:flex; align-items:center; gap:8px;
+      box-shadow:0 10px 18px rgba(0,0,0,0.25);
+    }
+    .btn-ghost{
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.14);
+      color:#fff;
+    }
+    .btn-ghost:hover{ background:rgba(255,255,255,0.10); transform:translateY(-1px); }
+    .btn-ok{
+      background:linear-gradient(180deg, rgba(58,168,104,0.95), rgba(46,139,87,0.95));
+      color:#fff;
+    }
+    .btn-ok:hover{ transform:translateY(-1px); filter:brightness(1.02); }
+    .btn-warn{
+      background:linear-gradient(180deg, rgba(226,163,0,0.95), rgba(212,140,0,0.95));
+      color:#1a1a1a;
+    }
+    .btn-warn:hover{ transform:translateY(-1px); filter:brightness(1.02); }
+
+    .confirm-title{
+      font-weight:1000; font-size:14px; margin-bottom:10px; color:#eaf3ff;
+    }
+    .confirm-kv{
+      display:grid; grid-template-columns:160px 1fr;
+      gap:10px; align-items:center;
+      padding:10px 0;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    .confirm-kv:last-child{ border-bottom:none; }
+    .k{ color:#b8d6ff; font-weight:1000; font-size:12px; }
+    .v{ font-weight:900; white-space:pre-wrap; }
+
+    .op-mode{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:2px;
+    }
+    .pill-radio{
+      display:flex; align-items:center; gap:8px;
+      padding:10px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(0,0,0,0.25);
+      cursor:pointer;
+      user-select:none;
+      font-weight:1000;
+      font-size:12px;
+    }
+    .pill-radio input{ accent-color: var(--green); }
+    .pill-radio.active{
+      border-color: rgba(58,168,104,0.55);
+      background: rgba(58,168,104,0.16);
+    }
+    /* ================================
+   AJUSTE DE TAMANHO (COMPACTO)
+   Cole no FINAL do seu <style>
+================================ */
+:root{
+  --pageMax: 1340px;          /* antes 1400 */
+  --leftCol: 245px;           /* antes 250 */
+  --rightCol: 360px;          /* antes 360 */
+  --gapCompact: 14px;         /* antes 15 */
+
+  /* Se ainda ficar grande: 0.92 / 0.90 / 0.88 (Chrome/Edge) */
+  --uiZoomDesktop: 1.08;
+}
+
+/* evita barra horizontal chata */
+body{ overflow-x:hidden; }
+
+/* encolhe um pouco no desktop (Chrome/Edge) */
+@media (min-width: 1150px){
+  .header, .controls, .dashboard, .footer{ max-width: var(--pageMax) !important; }
+  .dashboard{
+    grid-template-columns: var(--leftCol) minmax(0,1fr) var(--rightCol) !important;
+    gap: var(--gapCompact) !important;
+  }
+
+  /* opcional: “encolhe” o conjunto todo no desktop */
+  body{ zoom: var(--uiZoomDesktop); }
+}
+
+/* --- header --- */
+.header{ margin:12px auto 6px !important; }
+.header-title-box{ padding:14px 20px !important; }
+.header-title-box h1{ font-size:20px !important; }
+.subtitle{ font-size:11px !important; }
+.header-logo-box{ height:62px !important; }
+.header-logo-box img{ max-height:56px !important; }
+
+/* --- controles topo --- */
+.controls{ padding:4px 12px !important; margin:0 auto 8px !important; gap:8px !important; }
+.btn{ padding:8px 14px !important; font-size:12px !important; border-radius:10px !important; }
+.status{ min-width:240px !important; font-size:11px !important; padding:7px 10px !important; }
+
+/* --- cards / textos --- */
+.card{ padding:13px 16px !important; border-radius:20px !important; min-width:0; }
+.card-header{ font-size:14px !important; margin-bottom:10px !important; padding-bottom:8px !important; }
+.period-pill{ font-size:11px !important; padding:4px 9px !important; }
+
+/* --- painel esquerdo --- */
+.machine-select{ padding:9px 10px !important; font-size:13px !important; }
+.current-status{ padding:12px !important; }
+.status-value{ font-size:20px !important; }
+.status-buttons{ gap:9px !important; }
+.status-btn{ padding:11px !important; font-size:13px !important; border-radius:12px !important; }
+
+/* --- resumo --- */
+.summary-grid{ gap:10px !important; }
+.summary-item{ padding:11px !important; border-radius:14px !important; }
+.summary-value{ font-size:18px !important; }
+
+/* --- recentes --- */
+.history-item{ padding:11px 12px !important; border-radius:16px !important; }
+.history-status{ font-size:15px !important; }
+.history-obs{ font-size:12px !important; }
+
+/* --- filtros e tabela --- */
+.filter-select{ padding:9px 10px !important; font-size:12px !important; min-width:190px !important; }
+.history-table-container{ max-height:520px !important; }
+.history-table{ font-size:11px !important; }
+.history-table th{ padding:10px 9px !important; }
+.history-table td{ padding:9px 9px !important; }
+
+.history-table td.obs-cell{
+  min-width:300px !important;   /* antes 360 */
+  word-break:break-word;
+}
+
+/* badge menor pra caber melhor */
+.status-badge{
+  min-width:150px !important;   /* antes 170 */
+  font-size:10.5px !important;
+}
+
+  </style>
+</head>
+
+<body>
+  <!-- CABEÇALHO -->
+  <div class="header">
+    <div class="header-title-box">
+      <h1>STATUS DAS MÁQUINAS - HISTÓRICO COMPLETO</h1>
+      <div class="subtitle">Controle e monitoramento em tempo real</div>
+    </div>
+    <div class="header-logo-box">
+      <img src="sodramar-logo.png" alt="Sodramar">
+    </div>
+  </div>
+
+  <!-- CONTROLES -->
+  <div class="controls">
+    <button class="btn btn-secondary" id="btnLoadMore" onclick="carregarMaisAntigos()" style="display:none;">
+      ⬇️ Carregar mais antigos
+    </button>
+
+    <button class="btn btn-primary" id="btnRefresh" onclick="carregarHistorico({ force: true })">
+      <span id="loadingSpinner" class="loading-spinner" style="display:none;"></span>
+      🔄 Atualizar Histórico
+    </button>
+
+    <div class="status" id="statusMessage">
+      Selecione uma máquina para visualizar o histórico
+    </div>
+  </div>
+
+  <div class="dashboard">
+    <!-- ESQUERDA -->
+    <div class="card">
+      <div class="card-header">
+        <span>Controle</span>
+      </div>
+
+      <div class="machine-select-container">
+        <label class="machine-select-label">Selecione a Máquina:</label>
+        <select class="machine-select" id="machineSelect" onchange="selecionarMaquina()">
+          <option value="">Selecione...</option>
+          <option value="Máquina 1">Máquina 1</option>
+          <option value="Máquina 2">Máquina 2</option>
+          <option value="Máquina 3">Máquina 3</option>
+          <option value="Máquina 4">Máquina 4</option>
+          <option value="Máquina 5">Máquina 5</option>
+          <option value="Máquina 6">Máquina 6</option>
+          <option value="Máquina 7">Máquina 7</option>
+          <option value="Máquina 8">Máquina 8</option>
+          <option value="Máquina 9">Máquina 9</option>
+          <option value="Máquina 10">Máquina 10</option>
+          <option value="Máquina 11">Máquina 11</option>
+        </select>
+      </div>
+
+      <div class="current-status" id="currentStatusContainer">
+        <div class="status-label">Status Atual</div>
+        <div class="status-value" id="currentStatusValue">-</div>
+        <div class="status-timestamp" id="currentStatusTimestamp">Última atualização: -</div>
+      </div>
+
+      <div class="status-buttons">
+        <button class="status-btn status-btn-run" onclick="abrirAcao('funcionamento')">
+          ▶️ Em funcionamento
+        </button>
+        <button class="status-btn status-btn-stop" onclick="abrirAcao('parada')">
+          ⏸️ Parada
+        </button>
+        <button class="status-btn status-btn-maint" onclick="abrirAcao('manutencao')">
+          🛠️ Em manutenção
+        </button>
+      </div>
+
+      <div class="message" id="messageContainer"></div>
+    </div>
+
+    <!-- CENTRO -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-wrap">
+          <span>Histórico Completo</span>
+          <span class="period-pill" id="periodHistory">Período: -</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="filters-toggle" id="btnToggleFilters" onclick="toggleAdvancedFilters()">
+            <span class="dot"></span> 🔎 Filtros
+          </div>
+          <span class="records-pill" id="totalRecords">0 registros</span>
+        </div>
+      </div>
+
+      <div class="filters-row">
+        <select class="filter-select" id="filterStatus" onchange="aplicarFiltros()">
+          <option value="todos">Todos os status</option>
+          <option value="Em funcionamento">Em funcionamento</option>
+          <option value="Parada">Parada</option>
+          <option value="Em manutenção">Em manutenção</option>
+        </select>
+
+        <select class="filter-select" id="filterOrder" onchange="aplicarFiltros()">
+          <option value="recente">Mais recente primeiro</option>
+          <option value="antigo">Mais antigo primeiro</option>
+        </select>
+      </div>
+
+      <div class="filters-advanced" id="advancedFilters">
+        <div class="filters-row">
+          <select class="filter-select" id="filterYear" onchange="onChangeYear()"></select>
+          <select class="filter-select" id="filterMonth" onchange="onChangeMonth()"></select>
+          <select class="filter-select" id="filterDay" onchange="aplicarFiltros()"></select>
+        </div>
+      </div>
+
+      <div class="history-table-container">
+        <table class="history-table" id="historyTable">
+          <thead>
+            <tr>
+              <th style="width:52px;">#</th>
+              <th style="width:110px;">Data</th>
+              <th style="width:95px;">Hora</th>
+              <th style="width:230px;">Status</th>
+              <th style="width:110px;">Código</th>
+              <th style="width:120px;">OP</th>
+              <th style="min-width:360px;">Observação</th> <!-- ✅ mais larga -->
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr>
+              <td colspan="7" style="text-align:center; padding:40px; color:#a8d0ff;">
+                Selecione uma máquina para visualizar o histórico
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DIREITA -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-wrap">
+          <span>Resumo</span>
+          <span class="period-pill" id="periodSummary">Período: -</span>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-label">Total de Registros</div>
+          <div class="summary-value" id="summaryTotal">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Última Atualização</div>
+          <div class="summary-value" id="summaryLastUpdate">-</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Funcionamento</div>
+          <div class="summary-value" id="summaryRunning">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Paradas</div>
+          <div class="summary-value" id="summaryStopped">0</div>
+        </div>
+      </div>
+
+      <div class="card-header" style="margin-top:10px;">
+        <span>Histórico Recente</span>
+      </div>
+
+      <div class="recent-history" id="recentHistory">
+        <div class="history-item">
+          <div class="history-time">--/--/---- --:--:--</div>
+          <div class="history-status">Nenhum registro</div>
+          <div class="history-obs">Selecione uma máquina</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        Última atualização: <span id="lastUpdateTime">--:--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">
+          <span class="modal-icon">✅</span>
+          <span>Confirmação</span>
+        </div>
+        <button class="modal-close" id="modalCloseBtn" onclick="fecharModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- STEP 1 -->
+        <div id="modalStepForm" class="modal-card">
+          <div class="modal-grid" id="formGrid"></div>
+          <div class="err" id="modalError"></div>
+          <div class="hint" id="modalHint"></div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div id="modalStepConfirm" class="modal-card" style="display:none;">
+          <div class="confirm-title">Deseja enviar dessa forma?</div>
+          <div id="confirmBox"></div>
+          <div class="hint" style="margin-top:10px;">
+            Se estiver tudo certo, confirme. Caso contrário, volte e ajuste antes de lançar.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+<script>
+  // ==========================
+  // URLs do Web App
+  // ==========================
+  const URL_GET  = "https://script.google.com/macros/s/AKfycby5aTKl97h_sDmC7WeIK9upKpEdohBwoKVJ1bm5cs0G5Jo71qBwqp77RNqC9X_Xubk/exec";
+  const URL_POST = "https://script.google.com/macros/s/AKfycby5aTKl97h_sDmC7WeIK9upKpEdohBwoKVJ1bm5cs0G5Jo71qBwqp77RNqC9X_Xubk/exec";
+
+  // ==========================
+  // Parâmetros
+  // ==========================
+  const LIMIT_FULL   = 400;
+  const LIMIT_DELTA  = 400;
+  const WINDOW_READ  = 6000;
+
+  const POLL_FAST_MS = 5000;
+  const POLL_SLOW_MS = 20000;
+  const PENDENTE_TTL_MS = 10 * 60 * 1000;
+
+  // ==========================
+  // Códigos (PARADAS)
+  // ==========================
+  const CODIGOS_RAW = [
+    {id:1,  desc:"REVEZAMENTO"},
+    {id:2,  desc:"REFEIÇÃO"},
+    {id:3,  desc:"TROCA DE MOLDE"},
+    {id:4,  desc:"REGULAGEM"},
+    {id:5,  desc:"MANUT.ELÉTRICA"},
+    {id:6,  desc:"FERRAMENTARIA"},
+    {id:7,  desc:"ESTUFAGEM"},
+    {id:8,  desc:"AQUECIMENTO MAQ"},
+    {id:9,  desc:"MANUT. MECÂNICA"},
+    {id:10, desc:"MANUT.MEC.PREVEN"},
+    {id:11, desc:"FALTA MP"},
+    {id:12, desc:"LIMPEZA MÁQUINA"},
+    {id:13, desc:"AGUARD.REGULAGEM"},
+    {id:14, desc:"TRY-OUT"},
+    {id:15, desc:"SEM PROGRAMAÇÃO"},
+    {id:16, desc:"FALTA DE ENERGIA"},
+    {id:17, desc:"FALTA DE OPERADOR"},
+    {id:18, desc:"FALTA DE EMBALAGEM"},
+    {id:19, desc:"AGUAR.TROCA MOLDE"},
+    {id:20, desc:"FIM PRODUÇÃO"},
+    {id:21, desc:"REVISÃO REFRIGERA"},
+    {id:22, desc:"LIMPEZA MOLDE"},
+    {id:23, desc:"LIMPEZA CILINDRO"},
+    {id:24, desc:"AGUARDANDO C.Q"},
+    {id:25, desc:"CARREGAR CAMINHÃO"},
+    {id:26, desc:"REUNIÃO"},
+    {id:27, desc:"FALTA COMPONENTE"},
+    {id:28, desc:"HORÁRIO BANHEIRO"},
+    {id:29, desc:"AGUARDA.PPCP"},
+    {id:30, desc:"FALTA OP"},
+    {id:31, desc:"FALTA ETIQUETAS"},
+    {id:32, desc:"FALTA DOCUMENTOS"},
+    {id:33, desc:"MP CONTAMINADO"},
+    {id:34, desc:"TREINAMENTO"},
+    {id:35, desc:"AGUARD. MOAGEM"},
+    {id:36, desc:"OUTROS"},
+    {id:37, desc:"AGUARD.DEF.CLIENTE"},
+    {id:38, desc:"FALTA AQUECEDOR"},
+    {id:39, desc:"ABASTE.MAQ.FERRO"},
+    {id:40, desc:"INICIO PRODUÇÃO"},
+    {id:41, desc:"LIMPEZA SETOR"},
+    {id:42, desc:"BUSCAR MP SODRAM"},
+    {id:43, desc:"PROBLEMA G1"},
+    {id:44, desc:"PROBLEMA G2"},
+    {id:45, desc:"PROB. TORRE RESFR"},
+    {id:46, desc:"PEÇA PRESA MOLDE"},
+    {id:47, desc:"TROCA DE POSTIÇO"},
+    {id:48, desc:"TROCA DE SERRA"},
+    {id:49, desc:"FALTA DE ESPAÇO"},
+    {id:50, desc:"BICO ENTUPIDO"},
+    {id:51, desc:"FORA DE CICLO"},
+    {id:52, desc:"EMBAL / TESTE / COLETOR"},
+    {id:53, desc:"MANCHAS LEITOSA"},
+    {id:54, desc:"SAÍDA SEM RETORNO"},
+    {id:56, desc:"AGUARD. TÉCNICO PROC."}
+  ];
+
+  const CODIGOS_MANUT = CODIGOS_RAW.filter(c => /MANUT/i.test(c.desc));
+  const CODIGOS_PARADA = CODIGOS_RAW.filter(c => !/MANUT/i.test(c.desc));
+  const CODIGO_MAP = new Map(CODIGOS_RAW.map(c => [String(c.id), c.desc]));
+
+  // ==========================
+  // Globais
+  // ==========================
+  let dadosHistoricoPlanilha = [];
+  let dadosHistorico = [];
+  let dadosFiltrados = [];
+  let pendentesEnvio = [];
+
+  let maquinaSelecionada = "";
+  let carregando = false;
+  let enviando = false;
+  let pausadoUI = false;
+
+  const lastTimestampByMachine = {};
+  const oldestTimestampByMachine = {};
+  const hasMoreByMachine = {};
+
+  let anosDisponiveis = [];
+  let mesesDisponiveis = [];
+  let diasDisponiveis = [];
+
+  let pollTimer = null;
+
+  // DOM
+  const statusElement = document.getElementById('statusMessage');
+  const loadingSpinner = document.getElementById('loadingSpinner');
+  const messageContainer = document.getElementById('messageContainer');
+  const btnLoadMore = document.getElementById('btnLoadMore');
+  const btnRefresh = document.getElementById('btnRefresh');
+
+  const advancedFilters = document.getElementById('advancedFilters');
+  const periodHistory = document.getElementById('periodHistory');
+  const periodSummary = document.getElementById('periodSummary');
+
+  // Modal DOM
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalStepForm = document.getElementById('modalStepForm');
+  const modalStepConfirm = document.getElementById('modalStepConfirm');
+  const formGrid = document.getElementById('formGrid');
+  const modalFooter = document.getElementById('modalFooter');
+  const modalError = document.getElementById('modalError');
+  const modalHint = document.getElementById('modalHint');
+  const confirmBox = document.getElementById('confirmBox');
+
+  // estado do modal
+  let modalState = {
+    tipo: null, // 'parada' | 'manutencao' | 'funcionamento'
+    status: null,
+    codigo: '',
+    codigoDesc: '',
+    opMode: 'continuacao',
+    op: '',
+    observacao: ''
+  };
+
+  // ==========================
+  // Utils
+  // ==========================
+  function uuidv4(){
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random()*16|0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function normalizeStr(s){ return String(s || '').trim(); }
+
+  function obterNomeMaquina(item){
+    return (item['Máquina'] || item['Maquina'] || '').toString().trim();
+  }
+
+  function parseDMY(dmy){
+    const m = String(dmy || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m) return null;
+    return { d: parseInt(m[1],10), mo: parseInt(m[2],10), y: parseInt(m[3],10) };
+  }
+
+  function formatarData(dateObj){
+    if(!dateObj || isNaN(dateObj.getTime())) return '--/--/----';
+    const d = String(dateObj.getDate()).padStart(2,'0');
+    const m = String(dateObj.getMonth()+1).padStart(2,'0');
+    const a = dateObj.getFullYear();
+    return `${d}/${m}/${a}`;
+  }
+
+  function formatarHora(dateObj){
+    if(!dateObj || isNaN(dateObj.getTime())) return '--:--:--';
+    const h = String(dateObj.getHours()).padStart(2,'0');
+    const m = String(dateObj.getMinutes()).padStart(2,'0');
+    const s = String(dateObj.getSeconds()).padStart(2,'0');
+    return `${h}:${m}:${s}`;
+  }
+
+  function keyRegistro(r){
+    const rid = String(r.RequestId || '').trim();
+    if(rid) return `RID:${rid}`;
+    const ts = String(r.Timestamp || '');
+    const maq = obterNomeMaquina(r);
+    const st = String(r.Status || '');
+    const ob = String(r['Observação'] || '');
+    return `F:${ts}|${maq}|${st}|${ob}`;
+  }
+
+  function atualizarStatus(mensagem, tipo='info'){
+    statusElement.textContent = mensagem;
+    statusElement.className = 'status';
+    if(tipo==='success') statusElement.classList.add('success');
+    if(tipo==='error') statusElement.classList.add('error');
+    if(tipo==='loading') statusElement.classList.add('loading');
+  }
+
+  function mostrarMensagem(texto, tipo){
+    messageContainer.textContent = texto;
+    messageContainer.className = `message ${tipo}`;
+    messageContainer.style.display = 'block';
+  }
+
+  function ocultarMensagem(){
+    messageContainer.style.display = 'none';
+  }
+
+  function setPausado(flag){
+    pausadoUI = !!flag;
+    btnRefresh.disabled = pausadoUI;
+    document.getElementById('btnToggleFilters').style.pointerEvents = pausadoUI ? 'none' : 'auto';
+    document.getElementById('btnToggleFilters').style.opacity = pausadoUI ? '0.55' : '1';
+  }
+
+  // ==========================
+  // Carregamento histórico
+  // ==========================
+  async function carregarHistorico(opts = {}){
+    const force = !!opts.force;
+    const before = opts.before || null;
+
+    if(carregando || pausadoUI) return;
+    carregando = true;
+    loadingSpinner.style.display = 'inline-block';
+
+    atualizarStatus(before ? 'Carregando mais antigos...' : 'Carregando histórico...', 'loading');
+    ocultarMensagem();
+
+    try{
+      if(!maquinaSelecionada){
+        atualizarStatus('Selecione uma máquina para carregar o histórico.', 'info');
+        return;
+      }
+
+      const params = new URLSearchParams();
+      params.set('maquina', maquinaSelecionada);
+      params.set('window', WINDOW_READ);
+
+      if(before){
+        params.set('before', before);
+        params.set('limit', LIMIT_FULL);
+      }else{
+        const lastTs = lastTimestampByMachine[maquinaSelecionada];
+        if(!force && lastTs){
+          params.set('after', lastTs);
+          params.set('limit', LIMIT_DELTA);
+        }else{
+          params.set('limit', LIMIT_FULL);
+        }
+      }
+
+      params.set('_', Date.now());
+
+      const url = `${URL_GET}?${params.toString()}`;
+      const resp = await fetch(url, { method:'GET', cache:'no-store' });
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+
+      const json = await resp.json();
+      if(!json.success) throw new Error(json.error || 'Resposta inválida do servidor.');
+
+      const registros = Array.isArray(json.registros) ? json.registros : [];
+      const meta = json.meta || {};
+
+      const novos = registros.map(r => {
+        const linha = { ...r };
+
+        // normaliza nomes
+        linha['Máquina'] = linha['Máquina'] || linha['Maquina'] || '';
+        linha['Observação'] = linha['Observação'] || linha['Observacao'] || '';
+
+        // campos novos da planilha
+        linha['Número OP'] = linha['Número OP'] || linha['Numero OP'] || linha.numeroOP || '';
+        linha['Código Parada'] = linha['Código Parada'] || linha['Codigo Parada'] || linha.codigoParada || '';
+        linha['Código Manutenção'] = linha['Código Manutenção'] || linha['Codigo Manutenção'] || linha.codigoManutencao || '';
+
+        const tsObj = linha.Timestamp ? new Date(linha.Timestamp) : null;
+        linha._timestampObj = (tsObj && !isNaN(tsObj.getTime())) ? tsObj : null;
+
+        linha._dataFormatada = linha.data || (linha._timestampObj ? formatarData(linha._timestampObj) : '--/--/----');
+        linha._horaFormatada = linha.hora || (linha._timestampObj ? formatarHora(linha._timestampObj) : '--:--:--');
+
+        const dmy = parseDMY(linha._dataFormatada);
+        linha._ano = dmy ? dmy.y : null;
+        linha._mes = dmy ? dmy.mo : null;
+        linha._dia = dmy ? dmy.d : null;
+
+        linha._pendente = false;
+        linha._pendenteId = '';
+
+        return linha;
+      });
+
+      if(meta.lastTimestamp) lastTimestampByMachine[maquinaSelecionada] = meta.lastTimestamp;
+      if(meta.oldestTimestamp) oldestTimestampByMachine[maquinaSelecionada] = meta.oldestTimestamp;
+      hasMoreByMachine[maquinaSelecionada] = !!meta.possiblyHasMore;
+
+      btnLoadMore.style.display =
+        (hasMoreByMachine[maquinaSelecionada] && oldestTimestampByMachine[maquinaSelecionada]) ? 'flex' : 'none';
+
+      const base = (before ? [...dadosHistoricoPlanilha, ...novos] : [...novos, ...dadosHistoricoPlanilha]);
+
+      const seen = new Set();
+      const mergedPlanilha = [];
+      for(const r of base){
+        const k = keyRegistro(r);
+        if(seen.has(k)) continue;
+        seen.add(k);
+        mergedPlanilha.push(r);
+      }
+      dadosHistoricoPlanilha = mergedPlanilha;
+
+      reconstruirDadosHistorico();
+      exibirHistoricoMaquina();
+
+      atualizarStatus(novos.length ? `✅ +${novos.length} novos registros` : '✅ Sem novos registros', 'success');
+
+    }catch(err){
+      console.error(err);
+      atualizarStatus(`❌ Erro: ${err.message}`, 'error');
+    }finally{
+      carregando = false;
+      loadingSpinner.style.display = 'none';
+    }
+  }
+
+  function carregarMaisAntigos(){
+    if(!maquinaSelecionada) return;
+    const oldest = oldestTimestampByMachine[maquinaSelecionada];
+    if(!oldest) return;
+    carregarHistorico({ before: oldest });
+  }
+
+  function ordenarDadosHistorico(){
+    dadosHistorico.sort((a,b) => {
+      const A = a._timestampObj ? a._timestampObj.getTime() : 0;
+      const B = b._timestampObj ? b._timestampObj.getTime() : 0;
+      return B - A;
+    });
+  }
+
+  function reconstruirDadosHistorico(){
+    const base = [...dadosHistoricoPlanilha];
+
+    if(pendentesEnvio.length === 0){
+      dadosHistorico = base;
+      ordenarDadosHistorico();
+      return;
+    }
+
+    const agora = Date.now();
+    const planilhaReqIds = new Set(
+      base.map(r => String(r.RequestId||'').trim()).filter(Boolean)
+    );
+
+    const novosPendentes = [];
+    for(const p of pendentesEnvio){
+      const criadoMs = new Date(p.criadoEm).getTime();
+      const idade = agora - criadoMs;
+
+      if(p.id && planilhaReqIds.has(p.id)) continue;
+      if(idade > PENDENTE_TTL_MS) continue;
+
+      const dataObj = new Date(p.criadoEm);
+      const dmy = parseDMY(formatarData(dataObj));
+
+      base.unshift({
+        Timestamp: dataObj.toISOString(),
+        'Máquina': p.maquina,
+        Status: p.status,
+        'Observação': p.observacao,
+        'Número OP': p.numeroOP || '',
+        'Código Parada': p.codigoParada || '',
+        'Código Manutenção': p.codigoManutencao || '',
+        RequestId: p.id,
+        _timestampObj: dataObj,
+        _dataFormatada: formatarData(dataObj),
+        _horaFormatada: formatarHora(dataObj),
+        _ano: dmy ? dmy.y : null,
+        _mes: dmy ? dmy.mo : null,
+        _dia: dmy ? dmy.d : null,
+        _pendente: true,
+        _pendenteId: p.id
+      });
+
+      novosPendentes.push(p);
+    }
+    pendentesEnvio = novosPendentes;
+
+    const seen = new Set();
+    const finalList = [];
+    for(const r of base){
+      const k = keyRegistro(r);
+      if(seen.has(k)) continue;
+      seen.add(k);
+      finalList.push(r);
+    }
+    dadosHistorico = finalList;
+    ordenarDadosHistorico();
+  }
+
+  // ==========================
+  // Seleção de máquina
+  // ==========================
+  function selecionarMaquina(){
+    const select = document.getElementById('machineSelect');
+    maquinaSelecionada = select.value;
+
+    // limpa filtros sempre que trocar a máquina (evita bug de NaN)
+    document.getElementById('filterYear').innerHTML = '';
+    document.getElementById('filterMonth').innerHTML = '';
+    document.getElementById('filterDay').innerHTML = '';
+    advancedFilters.classList.remove('show');
+
+    if(!maquinaSelecionada){
+      limparExibicao();
+      atualizarStatus('Selecione uma máquina', 'info');
+      btnLoadMore.style.display = 'none';
+      return;
+    }
+
+    dadosHistoricoPlanilha = [];
+    dadosHistorico = [];
+    dadosFiltrados = [];
+
+    lastTimestampByMachine[maquinaSelecionada] = null;
+    oldestTimestampByMachine[maquinaSelecionada] = null;
+    hasMoreByMachine[maquinaSelecionada] = false;
+
+    carregarHistorico({ force:true });
+  }
+
+  // ==========================
+  // Filtros
+  // ==========================
+  function toggleAdvancedFilters(){
+    if(pausadoUI) return;
+    advancedFilters.classList.toggle('show');
+  }
+
+  function buildPeriodFilters(dadosMaquina){
+    const years = new Set();
+    for(const r of dadosMaquina){
+      if(r._ano) years.add(r._ano);
+    }
+    anosDisponiveis = Array.from(years).sort((a,b)=>a-b);
+
+    const selYear = document.getElementById('filterYear');
+    selYear.innerHTML = '';
+    if(anosDisponiveis.length === 0){
+      selYear.innerHTML = `<option value="">-</option>`;
+      return;
+    }
+
+    const defaultYear = Math.max(...anosDisponiveis);
+
+    anosDisponiveis.forEach(y=>{
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      if(y === defaultYear) opt.selected = true;
+      selYear.appendChild(opt);
+    });
+
+    buildMonths(dadosMaquina, defaultYear);
+    buildDays(dadosMaquina, defaultYear, 'todos');
+
+    document.getElementById('filterMonth').value = 'todos';
+    document.getElementById('filterDay').value = 'todos';
+  }
+
+  function buildMonths(dadosMaquina, year){
+    const months = new Set();
+    for(const r of dadosMaquina){
+      if(r._ano === year && r._mes) months.add(r._mes);
+    }
+    mesesDisponiveis = Array.from(months).sort((a,b)=>a-b);
+
+    const selMonth = document.getElementById('filterMonth');
+    selMonth.innerHTML = `<option value="todos">Todos os meses</option>`;
+
+    const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    mesesDisponiveis.forEach(m=>{
+      const opt = document.createElement('option');
+      opt.value = String(m);
+      opt.textContent = `${nomes[m-1]} (${String(m).padStart(2,'0')})`;
+      selMonth.appendChild(opt);
+    });
+  }
+
+  function buildDays(dadosMaquina, year, month){
+    const days = new Set();
+    for(const r of dadosMaquina){
+      if(r._ano !== year) continue;
+      if(month !== 'todos' && r._mes !== parseInt(month,10)) continue;
+      if(r._dia) days.add(r._dia);
+    }
+    diasDisponiveis = Array.from(days).sort((a,b)=>a-b);
+
+    const selDay = document.getElementById('filterDay');
+    selDay.innerHTML = `<option value="todos">Todos os dias</option>`;
+    diasDisponiveis.forEach(d=>{
+      const opt = document.createElement('option');
+      opt.value = String(d);
+      opt.textContent = String(d).padStart(2,'0');
+      selDay.appendChild(opt);
+    });
+  }
+
+  function onChangeYear(){
+    const dadosMaquina = dadosHistorico.filter(r => obterNomeMaquina(r) === maquinaSelecionada);
+    const year = parseInt(document.getElementById('filterYear').value,10);
+    buildMonths(dadosMaquina, year);
+    buildDays(dadosMaquina, year, 'todos');
+    document.getElementById('filterMonth').value = 'todos';
+    document.getElementById('filterDay').value = 'todos';
+    aplicarFiltros();
+  }
+
+  function onChangeMonth(){
+    const dadosMaquina = dadosHistorico.filter(r => obterNomeMaquina(r) === maquinaSelecionada);
+    const year = parseInt(document.getElementById('filterYear').value,10);
+    const month = document.getElementById('filterMonth').value;
+    buildDays(dadosMaquina, year, month);
+    document.getElementById('filterDay').value = 'todos';
+    aplicarFiltros();
+  }
+
+  function atualizarPeriodPills(year, monthVal, dayVal){
+    const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+    const monthTxt = (monthVal === 'todos') ? 'Todos os meses' : nomes[parseInt(monthVal,10)-1];
+    const dayTxt = (dayVal === 'todos') ? 'Todos os dias' : String(dayVal).padStart(2,'0');
+
+    const resumoTxt =
+      (monthVal==='todos' && dayVal==='todos')
+        ? `Período: ${year}`
+        : `Período: ${year} • ${monthTxt} • ${dayTxt}`;
+
+    const histTxt =
+      `Período: ${year} • ${monthTxt} • ${dayTxt}`;
+
+    periodSummary.textContent = resumoTxt;
+    periodHistory.textContent = histTxt;
+  }
+
+  function aplicarFiltros(){
+    if(!maquinaSelecionada) return;
+
+    const dadosMaquina = dadosHistorico.filter(r => obterNomeMaquina(r) === maquinaSelecionada);
+
+    // se filtro de ano ainda não existe, cria
+    if(dadosMaquina.length && !document.getElementById('filterYear').options.length){
+      buildPeriodFilters(dadosMaquina);
+    }
+
+    // período
+    let year = parseInt(document.getElementById('filterYear').value,10);
+    if(Number.isNaN(year)){
+      const years = dadosMaquina.map(x=>x._ano).filter(Boolean);
+      year = years.length ? Math.max(...years) : new Date().getFullYear();
+      if(document.getElementById('filterYear').options.length){
+        document.getElementById('filterYear').value = String(year);
+      }
+    }
+
+    const monthVal = document.getElementById('filterMonth').value || 'todos';
+    const dayVal = document.getElementById('filterDay').value || 'todos';
+
+    const dadosPeriodo = dadosMaquina.filter(r=>{
+      if(!r._ano || !r._mes || !r._dia) return true;
+      if(r._ano !== year) return false;
+      if(monthVal !== 'todos' && r._mes !== parseInt(monthVal,10)) return false;
+      if(dayVal !== 'todos' && r._dia !== parseInt(dayVal,10)) return false;
+      return true;
+    });
+
+    // status (tabela)
+    const filtroStatus = document.getElementById('filterStatus').value;
+    let lista = dadosPeriodo;
+    if(filtroStatus !== 'todos'){
+      lista = dadosPeriodo.filter(r => String(r.Status||'') === filtroStatus);
+    }
+
+    // ordem
+    const filtroOrder = document.getElementById('filterOrder').value;
+    if(filtroOrder === 'antigo'){
+      lista = [...lista].sort((a,b)=> (a._timestampObj?.getTime()||0) - (b._timestampObj?.getTime()||0));
+    }else{
+      lista = [...lista].sort((a,b)=> (b._timestampObj?.getTime()||0) - (a._timestampObj?.getTime()||0));
+    }
+
+    dadosFiltrados = lista;
+
+    atualizarPeriodPills(year, monthVal, dayVal);
+
+    atualizarStatusAtual(dadosPeriodo);
+    atualizarResumo(dadosPeriodo);
+    atualizarHistoricoRecente(dadosPeriodo);
+    atualizarTabelaHistorico();
+  }
+
+  // ==========================
+  // Exibição
+  // ==========================
+  function exibirHistoricoMaquina(){
+    if(!maquinaSelecionada) return;
+
+    const dadosMaquina = dadosHistorico.filter(r => obterNomeMaquina(r) === maquinaSelecionada);
+    aplicarFiltros();
+    atualizarStatus(`✅ ${dadosMaquina.length} registros para ${maquinaSelecionada}`, 'success');
+  }
+
+  function atualizarStatusAtual(dadosMaquina){
+    const statusValue = document.getElementById('currentStatusValue');
+    const statusTimestamp = document.getElementById('currentStatusTimestamp');
+    const statusContainer = document.getElementById('currentStatusContainer');
+
+    if(dadosMaquina.length === 0){
+      statusValue.textContent = '-';
+      statusTimestamp.textContent = 'Última atualização: -';
+      statusContainer.style.borderColor = 'rgba(255,255,255,0.10)';
+      return;
+    }
+
+    const ultimo = [...dadosMaquina].sort((a,b)=> (b._timestampObj?.getTime()||0) - (a._timestampObj?.getTime()||0))[0];
+
+    const st = String(ultimo.Status||'-');
+    statusValue.textContent = st + (ultimo._pendente ? ' (pendente)' : '');
+    statusTimestamp.textContent = `Última atualização: ${ultimo._dataFormatada} ${ultimo._horaFormatada}`;
+
+    statusContainer.style.borderColor = 'rgba(255,255,255,0.10)';
+    const low = st.toLowerCase();
+    if(low.includes('funcionamento')) statusContainer.style.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--green');
+    else if(low.includes('parada')) statusContainer.style.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--red');
+    else if(low.includes('manuten')) statusContainer.style.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--orange');
+  }
+
+  function atualizarResumo(dadosMaquina){
+    document.getElementById('summaryTotal').textContent = dadosMaquina.length;
+
+    if(dadosMaquina.length > 0){
+      const ultimo = [...dadosMaquina].sort((a,b)=> (b._timestampObj?.getTime()||0) - (a._timestampObj?.getTime()||0))[0];
+      document.getElementById('summaryLastUpdate').textContent = `${ultimo._horaFormatada}`;
+
+      const funcionamento = dadosMaquina.filter(r => String(r.Status||'').toLowerCase().includes('funcionamento')).length;
+      const parada = dadosMaquina.filter(r => String(r.Status||'').toLowerCase().includes('parada')).length;
+
+      document.getElementById('summaryRunning').textContent = funcionamento;
+      document.getElementById('summaryStopped').textContent = parada;
+    }else{
+      document.getElementById('summaryLastUpdate').textContent = '-';
+      document.getElementById('summaryRunning').textContent = '0';
+      document.getElementById('summaryStopped').textContent = '0';
+    }
+  }
+
+  // ==========================
+  // Extração (novo padrão da planilha)
+  // ==========================
+  function extrairDetalhes(reg){
+    const status = String(reg.Status||'');
+    const low = status.toLowerCase();
+
+    // colunas novas
+    const opCol =
+      reg['Número OP'] || reg['Numero OP'] || reg.numeroOP || reg.op || '';
+
+    const codPar =
+      reg['Código Parada'] || reg['Codigo Parada'] || reg.codigoParada || '';
+
+    const codMan =
+      reg['Código Manutenção'] || reg['Codigo Manutenção'] || reg.codigoManutencao || '';
+
+    let codNum = '';
+    if(low.includes('parada')) codNum = String(codPar||'').trim();
+    else if(low.includes('manuten')) codNum = String(codMan||'').trim();
+
+    let obs = reg['Observação'] || reg['Observacao'] || reg.observacao || '';
+    let op  = String(opCol||'').trim();
+
+    // fallback pra linhas antigas (se existirem)
+    const obsStr = String(obs || '');
+    if(!op){
+      const mop = obsStr.match(/\bOP\s*:\s*([A]?\d{5,6})\b/i);
+      if(mop) op = mop[1].toUpperCase();
+    }
+    if(!codNum){
+      const mcod = obsStr.match(/\bC[ÓO]D\s*:\s*(\d{1,3})\b/i);
+      if(mcod) codNum = mcod[1];
+    }
+    const mobs = obsStr.match(/\bOBS\s*:\s*([\s\S]*)$/i);
+    const obsFinal = mobs ? mobs[1].trim() : obsStr.trim();
+
+    const codDesc = codNum ? (CODIGO_MAP.get(String(codNum)) || '') : '';
+    return { codigo: codNum, codigoDesc: codDesc, op, obs: obsFinal };
+  }
+
+  // ==========================
+  // Recentes
+  // ==========================
+  function atualizarHistoricoRecente(dadosMaquina){
+    const container = document.getElementById('recentHistory');
+    container.innerHTML = '';
+
+    const ordenados = [...dadosMaquina].sort((a,b)=> (b._timestampObj?.getTime()||0) - (a._timestampObj?.getTime()||0));
+    const recentes = ordenados.slice(0,5);
+
+    if(recentes.length === 0){
+      container.innerHTML = `
+        <div class="history-item">
+          <div class="history-time">--/--/---- --:--:--</div>
+          <div class="history-status">Nenhum registro</div>
+          <div class="history-obs">Esta máquina ainda não tem histórico</div>
+        </div>
+      `;
+      return;
+    }
+
+    recentes.forEach(reg => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+
+      const status = String(reg.Status||'');
+      const low = status.toLowerCase();
+      if(low.includes('parada')) item.classList.add('parada');
+      if(low.includes('manuten')) item.classList.add('manutencao');
+
+      const det = extrairDetalhes(reg);
+      const hasCodigo = det.codigo ? `Cód: ${det.codigo}${det.codigoDesc ? ` - ${det.codigoDesc}`:''}` : '';
+      const hasOP = det.op ? `OP: ${det.op}` : '';
+      const obsTxt = det.obs ? det.obs : 'Sem observação';
+
+      const linha2 = [hasCodigo, hasOP].filter(Boolean).join(' | ');
+
+      item.innerHTML = `
+        <div class="history-time">${reg._dataFormatada} ${reg._horaFormatada}</div>
+        <div class="history-status">${status}${reg._pendente ? ' (pendente)' : ''}</div>
+        <div class="history-obs">${linha2 ? `<b>${linha2}</b> | ` : ''}${obsTxt}</div>
+      `;
+      container.appendChild(item);
+    });
+  }
+
+  // ==========================
+  // Tabela
+  // ==========================
+  function statusClassFromStatus(st){
+    const low = String(st||'').toLowerCase();
+    if(low.includes('parada')) return 'parada';
+    if(low.includes('manuten')) return 'manutencao';
+    return 'funcionamento';
+  }
+
+  function atualizarTabelaHistorico(){
+    const tbody = document.getElementById('historyTableBody');
+    const totalRecords = document.getElementById('totalRecords');
+
+    tbody.innerHTML = '';
+    totalRecords.textContent = `${dadosFiltrados.length} registros`;
+
+    if(dadosFiltrados.length === 0){
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align:center; padding:40px; color:#a8d0ff;">
+            Nenhum registro encontrado com os filtros atuais
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    dadosFiltrados.forEach((reg, idx)=>{
+      const tr = document.createElement('tr');
+      const st = String(reg.Status||'');
+      const cls = statusClassFromStatus(st);
+
+      const det = extrairDetalhes(reg);
+
+      tr.innerHTML = `
+        <td style="text-align:center; color:#9aa8c0; font-weight:1000;">${idx+1}</td>
+        <td>${reg._dataFormatada}</td>
+        <td>${reg._horaFormatada}</td>
+        <td><span class="status-badge ${cls}">${st}${reg._pendente ? ' (pendente)' : ''}</span></td>
+        <td>${det.codigo ? det.codigo : '-'}</td>
+        <td>${det.op ? det.op : '-'}</td>
+        <td class="obs-cell">${det.obs ? det.obs : '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const agora = new Date();
+    document.getElementById('lastUpdateTime').textContent =
+      agora.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  // ==========================
+  // Modal / Ações
+  // ==========================
+  function abrirAcao(tipo){
+    if(!maquinaSelecionada){
+      mostrarMensagem('Selecione uma máquina primeiro', 'error');
+      return;
+    }
+    if(enviando) return;
+
+    setPausado(true);
+
+    modalState = {
+      tipo,
+      status: (tipo === 'parada') ? 'Parada' : (tipo === 'manutencao') ? 'Em manutenção' : 'Em funcionamento',
+      codigo: '',
+      codigoDesc: '',
+      opMode: 'continuacao',
+      op: '',
+      observacao: ''
+    };
+
+    montarFormularioModal();
+    abrirModal();
+  }
+
+  function abrirModal(){
+    modalError.classList.remove('show');
+    modalError.textContent = '';
+    modalStepForm.style.display = 'block';
+    modalStepConfirm.style.display = 'none';
+    modalOverlay.classList.add('show');
+    modalOverlay.setAttribute('aria-hidden','false');
+    stopPoll();
+  }
+
+  function fecharModal(){
+    modalOverlay.classList.remove('show');
+    modalOverlay.setAttribute('aria-hidden','true');
+    setPausado(false);
+    startPoll();
+  }
+
+  function setModalError(msg){
+    modalError.textContent = msg;
+    modalError.classList.add('show');
+  }
+
+  function clearModalError(){
+    modalError.classList.remove('show');
+    modalError.textContent = '';
+  }
+
+  function montarFormularioModal(){
+    const tipo = modalState.tipo;
+
+    const icon = (tipo === 'parada') ? '⏸️' : (tipo === 'manutencao') ? '🛠️' : '▶️';
+    modalTitle.innerHTML = `
+      <span class="modal-icon">${icon}</span>
+      <span>${modalState.status}</span>
+    `;
+
+    formGrid.innerHTML = '';
+
+    formGrid.innerHTML += `
+      <div class="field">
+        <label>Máquina</label>
+        <input class="input" value="${maquinaSelecionada}" disabled />
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <input class="input" value="${modalState.status}" disabled />
+      </div>
+    `;
+
+    if(tipo === 'parada' || tipo === 'manutencao'){
+      const lista = (tipo === 'parada') ? CODIGOS_PARADA : CODIGOS_MANUT;
+
+      const options = ['<option value="">Selecione...</option>']
+        .concat(lista.map(c => `<option value="${c.id}">${c.id} - ${c.desc}</option>`))
+        .join('');
+
+      const labelCod = (tipo === 'parada') ? 'Código da Parada' : 'Código da Manutenção';
+
+      formGrid.innerHTML += `
+        <div class="field">
+          <label>${labelCod} (seleção)</label>
+          <select class="select" id="modalSelectCodigo">${options}</select>
+          <div class="hint">Os códigos de manutenção ficam bloqueados em “Parada”.</div>
+        </div>
+
+        <div class="field">
+          <label>${labelCod} (digitar)</label>
+          <input class="input" id="modalInputCodigo" placeholder="Ex.: 16" inputmode="numeric" />
+          <div class="hint">Se você digitar, o sistema ignora a seleção acima.</div>
+        </div>
+      `;
+    }
+
+    if(tipo === 'funcionamento'){
+      const dadosMaquina = dadosHistorico.filter(r => obterNomeMaquina(r) === maquinaSelecionada);
+      const ordenados = [...dadosMaquina].sort((a,b)=> (b._timestampObj?.getTime()||0) - (a._timestampObj?.getTime()||0));
+      let ultimaOp = '';
+      for(const r of ordenados){
+        const det = extrairDetalhes(r);
+        if(det.op){ ultimaOp = det.op; break; }
+      }
+
+      formGrid.innerHTML += `
+        <div class="field" style="grid-column:1/-1;">
+          <label>Número OP</label>
+          <div class="op-mode" id="opModeWrap">
+            <label class="pill-radio active" id="pillCont">
+              <input type="radio" name="opmode" value="continuacao" checked />
+              Continuação ${ultimaOp ? `(OP atual: ${ultimaOp})` : `(sem OP anterior)`}
+            </label>
+            <label class="pill-radio" id="pillNova">
+              <input type="radio" name="opmode" value="nova" />
+              Nova OP
+            </label>
+          </div>
+          <input class="input" id="modalInputOP" placeholder="A12345 ou 123456" style="margin-top:10px; display:none;" />
+          <div class="hint">Formatos permitidos: <b>A#####</b> ou <b>######</b>.</div>
+        </div>
+      `;
+
+      setTimeout(()=>{
+        const wrap = document.getElementById('opModeWrap');
+        const inputOP = document.getElementById('modalInputOP');
+        wrap.querySelectorAll('input[name="opmode"]').forEach(r=>{
+          r.addEventListener('change', ()=>{
+            const mode = wrap.querySelector('input[name="opmode"]:checked').value;
+            modalState.opMode = mode;
+            if(mode === 'nova'){
+              inputOP.style.display = 'block';
+              inputOP.focus();
+            }else{
+              inputOP.style.display = 'none';
+              inputOP.value = '';
+            }
+            document.getElementById('pillCont').classList.toggle('active', mode==='continuacao');
+            document.getElementById('pillNova').classList.toggle('active', mode==='nova');
+          });
+        });
+      }, 0);
+    }
+
+    // Observação no modal (maior)
+    const obsLabel = (tipo === 'manutencao') ? 'Observação (obrigatória)' : 'Observação (opcional)';
+    formGrid.innerHTML += `
+      <div class="field" style="grid-column:1/-1;">
+        <label>${obsLabel}</label>
+        <textarea class="textarea" id="modalObs" placeholder="Descreva o que aconteceu..."></textarea>
+      </div>
+    `;
+
+    modalHint.textContent =
+      (tipo === 'manutencao')
+        ? 'Na manutenção, a observação é obrigatória.'
+        : 'Dica: descreva rapidamente o motivo (opcional).';
+
+    modalFooter.innerHTML = `
+      <button class="btn-modal btn-ghost" onclick="cancelarModal()">Cancelar</button>
+      <button class="btn-modal ${(tipo==='manutencao') ? 'btn-warn' : 'btn-ok'}" onclick="irConfirmacao()">Continuar</button>
+    `;
+  }
+
+  function cancelarModal(){ fecharModal(); }
+
+  function irConfirmacao(){
+    clearModalError();
+    const tipo = modalState.tipo;
+
+    const obs = normalizeStr(document.getElementById('modalObs')?.value);
+    if(tipo === 'manutencao' && !obs){
+      setModalError('Na manutenção, a observação é obrigatória.');
+      return;
+    }
+    modalState.observacao = obs;
+
+    if(tipo === 'parada' || tipo === 'manutencao'){
+      const typed = normalizeStr(document.getElementById('modalInputCodigo')?.value);
+      const selected = normalizeStr(document.getElementById('modalSelectCodigo')?.value);
+
+      let cod = (typed || selected).replace(/[^\d]/g,'');
+      if(!cod){ setModalError('Selecione ou digite um código.'); return; }
+      if(!CODIGO_MAP.has(cod)){ setModalError('Código inválido. Confira a numeração.'); return; }
+
+      const desc = CODIGO_MAP.get(cod);
+      if(tipo === 'parada' && /MANUT/i.test(desc)){
+        setModalError('Esse código é de manutenção. Use “Em manutenção”.');
+        return;
+      }
+      if(tipo === 'manutencao' && !/MANUT/i.test(desc)){
+        setModalError('Esse código não é de manutenção. Use “Parada”.');
+        return;
+      }
+
+      modalState.codigo = cod;
+      modalState.codigoDesc = desc;
+    }
+
+    if(tipo === 'funcionamento'){
+      const mode = modalState.opMode;
+
+      if(mode === 'nova'){
+        let op = normalizeStr(document.getElementById('modalInputOP')?.value).toUpperCase();
+        const ok = /^(A\d{5}|\d{6})$/.test(op);
+        if(!ok){ setModalError('OP inválida. Formatos aceitos: A##### ou ######.'); return; }
+        modalState.op = op;
+      }else{
+        const dadosMaquina = dadosHistorico.filter(r => obterNomeMaquina(r) === maquinaSelecionada);
+        const ordenados = [...dadosMaquina].sort((a,b)=> (b._timestampObj?.getTime()||0) - (a._timestampObj?.getTime()||0));
+        let ultimaOp = '';
+        for(const r of ordenados){
+          const det = extrairDetalhes(r);
+          if(det.op){ ultimaOp = det.op; break; }
+        }
+        modalState.op = ultimaOp; // pode ser vazio
+      }
+    }
+
+    montarConfirmacao();
+  }
+
+  function montarConfirmacao(){
+    modalStepForm.style.display = 'none';
+    modalStepConfirm.style.display = 'block';
+
+    const tipo = modalState.tipo;
+
+    const codigoTxt = modalState.codigo ? `${modalState.codigo} - ${modalState.codigoDesc}` : '-';
+    const opTxt = modalState.op ? modalState.op : '-';
+    const obsTxt = modalState.observacao ? modalState.observacao : 'Sem observação';
+
+    const labelCodigo = (tipo === 'manutencao') ? 'Código Manutenção' : 'Código Parada';
+
+    confirmBox.innerHTML = `
+      <div class="confirm-kv"><div class="k">Máquina</div><div class="v">${maquinaSelecionada}</div></div>
+      <div class="confirm-kv"><div class="k">Status</div><div class="v">${modalState.status}</div></div>
+      <div class="confirm-kv"><div class="k">${(tipo==='parada' || tipo==='manutencao') ? labelCodigo : 'Código'}</div><div class="v">${(tipo==='parada' || tipo==='manutencao') ? codigoTxt : '-'}</div></div>
+      <div class="confirm-kv"><div class="k">Número OP</div><div class="v">${(tipo==='funcionamento') ? opTxt : '-'}</div></div>
+      <div class="confirm-kv"><div class="k">Observação</div><div class="v">${obsTxt}</div></div>
+    `;
+
+    modalFooter.innerHTML = `
+      <button class="btn-modal btn-ghost" onclick="voltarFormulario()">Voltar</button>
+      <button class="btn-modal btn-ok" onclick="confirmarEnvio()">Confirmar envio</button>
+    `;
+  }
+
+  function voltarFormulario(){
+    modalStepConfirm.style.display = 'none';
+    modalStepForm.style.display = 'block';
+    modalFooter.innerHTML = `
+      <button class="btn-modal btn-ghost" onclick="cancelarModal()">Cancelar</button>
+      <button class="btn-modal ${(modalState.tipo==='manutencao') ? 'btn-warn' : 'btn-ok'}" onclick="irConfirmacao()">Continuar</button>
+    `;
+  }
+
+  // ==========================
+  // Envio (campos separados -> planilha)
+  // ==========================
+  async function confirmarEnvio(){
+    if(enviando) return;
+    enviando = true;
+    setPausado(true);
+
+    const requestId = uuidv4();
+    const agora = new Date();
+
+    const observacao = modalState.observacao || 'Sem observação';
+
+    // prepara colunas
+    const numeroOP = (modalState.tipo === 'funcionamento') ? (modalState.op || '') : '';
+    const codigoParada = (modalState.tipo === 'parada') ? (modalState.codigo || '') : '';
+    const codigoManutencao = (modalState.tipo === 'manutencao') ? (modalState.codigo || '') : '';
+
+    // fecha modal
+    modalOverlay.classList.remove('show');
+
+    // pendente visual (já com colunas certas)
+    pendentesEnvio.push({
+      id: requestId,
+      maquina: maquinaSelecionada,
+      status: modalState.status,
+      observacao,
+      numeroOP,
+      codigoParada,
+      codigoManutencao,
+      criadoEm: agora.toISOString()
+    });
+
+    reconstruirDadosHistorico();
+    exibirHistoricoMaquina();
+    mostrarMensagem('✅ Registro lançado na tela (aguardando confirmação da planilha)...', 'success');
+
+    const body = new URLSearchParams();
+    body.set('maquina', maquinaSelecionada);
+    body.set('status', modalState.status);
+    body.set('observacao', observacao);
+    body.set('requestId', requestId);
+
+    if(numeroOP) body.set('numeroOP', numeroOP);
+    if(codigoParada) body.set('codigoParada', codigoParada);
+    if(codigoManutencao) body.set('codigoManutencao', codigoManutencao);
+
+    try{
+      await fetch(URL_POST, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: body.toString()
+      });
+    }catch(e){
+      try{
+        await fetch(URL_POST, {
+          method:'POST',
+          mode:'no-cors',
+          headers:{ 'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: body.toString()
+        });
+      }catch(e2){
+        console.error(e2);
+        mostrarMensagem('⚠️ Falha ao enviar. Vou tentar confirmar via atualização...', 'error');
+      }
+    }finally{
+      enviando = false;
+      setPausado(false);
+      startPoll();
+
+      setTimeout(() => carregarHistorico({ force:false }), 1500);
+      setTimeout(() => carregarHistorico({ force:false }), 3500);
+    }
+  }
+
+  // ==========================
+  // Limpar
+  // ==========================
+  function limparExibicao(){
+    document.getElementById('currentStatusValue').textContent = '-';
+    document.getElementById('currentStatusTimestamp').textContent = 'Última atualização: -';
+
+    document.getElementById('summaryTotal').textContent = '0';
+    document.getElementById('summaryLastUpdate').textContent = '-';
+    document.getElementById('summaryRunning').textContent = '0';
+    document.getElementById('summaryStopped').textContent = '0';
+
+    document.getElementById('recentHistory').innerHTML = `
+      <div class="history-item">
+        <div class="history-time">--/--/---- --:--:--</div>
+        <div class="history-status">Nenhum registro</div>
+        <div class="history-obs">Selecione uma máquina</div>
+      </div>
+    `;
+
+    document.getElementById('historyTableBody').innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:40px; color:#a8d0ff;">
+          Selecione uma máquina para visualizar o histórico
+        </td>
+      </tr>
+    `;
+
+    document.getElementById('totalRecords').textContent = '0 registros';
+    periodHistory.textContent = 'Período: -';
+    periodSummary.textContent = 'Período: -';
+  }
+
+  // ==========================
+  // Poll
+  // ==========================
+  function startPoll(){
+    stopPoll();
+    const loop = async () => {
+      const active = !document.hidden && !!maquinaSelecionada;
+      const delay = active ? POLL_FAST_MS : POLL_SLOW_MS;
+
+      if(maquinaSelecionada && !carregando && !pausadoUI){
+        carregarHistorico({ force:false });
+      }
+
+      pollTimer = setTimeout(loop, delay);
+    };
+    pollTimer = setTimeout(loop, 1200);
+  }
+
+  function stopPoll(){
+    if(pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+
+  function verificarPendentesPeriodicamente(){
+    if(!maquinaSelecionada) return;
+    if(pausadoUI) return;
+    if(pendentesEnvio.length === 0 && dadosHistoricoPlanilha.length === 0) return;
+
+    reconstruirDadosHistorico();
+    exibirHistoricoMaquina();
+  }
+
+  // ==========================
+  // Init
+  // ==========================
+  document.addEventListener('visibilitychange', () => {
+    if(!document.hidden && maquinaSelecionada && !pausadoUI){
+      carregarHistorico({ force:false });
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    startPoll();
+    setInterval(() => verificarPendentesPeriodicamente(), 10000);
+  });
+</script>
+
+</body>
+</html>
